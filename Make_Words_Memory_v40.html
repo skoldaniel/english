@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="sv">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Make Words Memory</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap">
+<style>
+/* Layout: settings bar on top, score strip, then a responsive grid of flip cards */
+:root{
+  --bg:#f3f6fc; --surface:#ffffff; --ink:#172036; --muted:#5b6784;
+  --accent:#2457d6; --accent-ink:#ffffff; --card-back:#2457d6; --card-pattern:#3a6ae0;
+  --face:#ffffff; --sv:#fff4c9; --match:#ffd84d; --match-ink:#3a2c00; --line:#d5ddef;
+  --p1:#2457d6; --p2:#c2410c;
+  --display:"Fredoka","Nunito",system-ui,sans-serif; --body:"Nunito",system-ui,sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0f1526; --surface:#18203a; --ink:#e8edfb; --muted:#9aa7c7;
+  --accent:#5b86ff; --accent-ink:#0b1020; --card-back:#2a4bb0; --card-pattern:#3659c4;
+  --face:#1f2947; --sv:#3b3418; --match:#f5c93a; --match-ink:#2a1f00; --line:#2c3758;
+  --p1:#7c9dff; --p2:#fb923c; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0f1526; --surface:#18203a; --ink:#e8edfb; --muted:#9aa7c7;
+  --accent:#5b86ff; --accent-ink:#0b1020; --card-back:#2a4bb0; --card-pattern:#3659c4;
+  --face:#1f2947; --sv:#3b3418; --match:#f5c93a; --match-ink:#2a1f00; --line:#2c3758;
+  --p1:#7c9dff; --p2:#fb923c; color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.5}
+.wrap{max-width:1040px;margin:0 auto;padding-inline:16px;padding-block:24px 48px;display:grid;gap:20px}
+h1{font-family:var(--display);font-weight:700;font-size:clamp(28px,6vw,42px);line-height:1.05;margin:0}
+.sub{margin:6px 0 0;color:var(--muted);max-width:60ch}
+.letters{display:flex;gap:4px;margin-top:10px}
+.letters span{font-family:var(--display);font-weight:700;width:24px;height:26px;border-radius:6px;background:var(--accent);color:var(--accent-ink);
+  display:grid;place-items:center;font-size:14px}
+
+.settings{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:18px 20px;
+  display:flex;flex-wrap:wrap;gap:18px 28px;align-items:end}
+.field{display:grid;gap:6px}
+.field>label,.field>.lab{font-weight:800;font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.count{display:flex;align-items:center;gap:8px}
+.count button{width:40px;height:40px;border-radius:10px;border:2px solid var(--line);background:var(--bg);color:var(--ink);font-size:22px;font-weight:800;cursor:pointer}
+#pairs{width:64px;height:40px;text-align:center;font-family:var(--display);font-size:22px;font-weight:600;border-radius:10px;border:2px solid var(--line);background:var(--bg);color:var(--ink);font-variant-numeric:tabular-nums}
+.seg{display:flex;border:2px solid var(--line);border-radius:12px;overflow:hidden}
+.seg input{position:absolute;opacity:0;pointer-events:none}
+.seg label{padding:8px 14px;font-weight:700;cursor:pointer;background:var(--bg)}
+.seg input:checked+label{background:var(--ink);color:var(--bg)}
+.seg input:focus-visible+label{outline:3px solid var(--match);outline-offset:-3px}
+.btn{font-family:var(--body);font-weight:800;font-size:16px;padding:10px 20px;border-radius:12px;border:2px solid var(--ink);background:var(--ink);color:var(--bg);cursor:pointer;height:44px}
+.btn.ghost{background:transparent;color:var(--ink);border-color:var(--line)}
+.btn:focus-visible,.count button:focus-visible,#pairs:focus-visible{outline:3px solid var(--match);outline-offset:2px}
+.note{font-size:13px;color:var(--muted);margin:0;flex-basis:100%}
+
+.status{display:flex;flex-wrap:wrap;gap:10px 22px;align-items:center;font-weight:700}
+.status b{font-family:var(--display);font-size:22px;font-variant-numeric:tabular-nums}
+.player{padding:6px 14px;border-radius:99px;border:2px solid var(--line);display:flex;gap:8px;align-items:center}
+.player.on{border-color:currentColor}
+.player.p1{color:var(--p1)} .player.p2{color:var(--p2)}
+.player span{color:var(--ink)}
+
+.board{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:10px}
+.card{aspect-ratio:4/3;max-width:100%;perspective:700px;border:0;padding:0;background:none;cursor:pointer;border-radius:12px}
+.card:focus-visible{outline:3px solid var(--match);outline-offset:3px}
+.in{position:relative;width:100%;height:100%;transition:transform .45s;transform-style:preserve-3d}
+.card.up .in,.card.done .in{transform:rotateY(180deg)}
+.f{position:absolute;inset:0;border-radius:12px;backface-visibility:hidden;display:grid;place-items:center;padding:6px}
+.back{background:var(--card-back);
+  background-image:radial-gradient(circle at 50% 50%,var(--card-pattern) 18%,transparent 19%),radial-gradient(circle at 0 0,var(--card-pattern) 18%,transparent 19%),radial-gradient(circle at 100% 100%,var(--card-pattern) 18%,transparent 19%);
+  background-size:28px 28px;box-shadow:0 3px 0 color-mix(in srgb,var(--card-back) 60%,#000)}
+.back::after{content:"?";font-family:var(--display);font-weight:700;font-size:26px;color:var(--accent-ink);opacity:.85}
+.front{transform:rotateY(180deg);background:var(--face);border:2px solid var(--line);font-family:var(--display);font-weight:600;
+  font-size:clamp(15px,2vw,20px);text-align:center;line-height:1.1;overflow-wrap:break-word;hyphens:manual}
+.front small{display:block;font-family:var(--body);font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:2px}
+.front.sv{background:var(--sv)}
+.card.done .front{background:var(--match);color:var(--match-ink);border-color:var(--match)}
+.card.done .front small{color:var(--match-ink);opacity:.7}
+.card.done{cursor:default}
+.card.miss .front{animation:shake .4s}
+@keyframes shake{25%{transform:rotateY(180deg) translateX(-5px)}75%{transform:rotateY(180deg) translateX(5px)}}
+
+.win{background:var(--match);color:var(--match-ink);border-radius:18px;padding:18px 22px;display:flex;flex-wrap:wrap;gap:12px 20px;align-items:center;justify-content:space-between}
+.win p{margin:0;font-family:var(--display);font-size:22px;font-weight:600}
+.win .btn{background:var(--match-ink);color:var(--match);border-color:var(--match-ink)}
+.list{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:16px 20px}
+.list h2{font-family:var(--display);font-weight:600;font-size:19px;margin:0 0 8px}
+.list ul{margin:0;padding:0;list-style:none;display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:4px 20px}
+.list li{display:flex;gap:8px}.list li b{font-family:var(--display);font-weight:600}.list li span{color:var(--muted)}
+@media (prefers-reduced-motion:reduce){.in{transition:none}.card.miss .front{animation:none}}
+@media (max-width:480px){.board{grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:8px}}
+</style>
+</head>
+<body style="margin:0">
+
+<div class="wrap">
+  <header>
+    <h1>Make Words Memory</h1>
+    <p class="sub">Find the pairs! Turn over two cards. If they match, you keep them. The words come from the Make words key.</p>
+    <div class="letters" aria-label="Letters F O V A M D G I E"><span>F</span><span>O</span><span>V</span><span>A</span><span>M</span><span>D</span><span>G</span><span>I</span><span>E</span></div>
+  </header>
+
+  <form class="settings" id="settings">
+    <div class="field">
+      <label for="pairs">Number of words</label>
+      <div class="count">
+        <button type="button" id="minus" aria-label="Fewer words">−</button>
+        <input id="pairs" type="number" inputmode="numeric" min="10" max="30" value="10">
+        <button type="button" id="plus" aria-label="More words">+</button>
+      </div>
+    </div>
+    <div class="field">
+      <span class="lab" id="modeLab">Pairs</span>
+      <div class="seg" role="radiogroup" aria-labelledby="modeLab">
+        <input type="radio" name="mode" id="mSv" value="sv" checked><label for="mSv">English + Swedish</label>
+        <input type="radio" name="mode" id="mSame" value="same"><label for="mSame">Same word</label>
+      </div>
+    </div>
+    <div class="field">
+      <span class="lab" id="plLab">Players</span>
+      <div class="seg" role="radiogroup" aria-labelledby="plLab">
+        <input type="radio" name="pl" id="pl1" value="1" checked><label for="pl1">1</label>
+        <input type="radio" name="pl" id="pl2" value="2"><label for="pl2">2</label>
+      </div>
+    </div>
+    <button type="submit" class="btn" id="newGame">New game</button>
+    <p class="note" id="note">Choose 10 to 30 words. New game picks new words at random.</p>
+  </form>
+
+  <div class="status" aria-live="polite">
+    <div>Pairs <b id="found">0</b> / <b id="total">0</b></div>
+    <div id="solo">Tries <b id="tries">0</b></div>
+    <div class="player p1" id="P1" hidden>Player 1 <span><b id="s1">0</b></span></div>
+    <div class="player p2" id="P2" hidden>Player 2 <span><b id="s2">0</b></span></div>
+  </div>
+
+  <div id="win" class="win" hidden><p id="winText"></p><button type="button" class="btn" id="again">Play again</button></div>
+  <div class="board" id="board"></div>
+  <div class="list" id="list" hidden><h2>Words in this game</h2><ul id="ul"></ul></div>
+</div>
+
+<script>
+// Words from the Make words key (letters F O V A M D G I E) with Swedish translations
+const DICT={
+ am:"är",do:"göra",go:"gå",if:"om",me:"mig",of:"av",ad:"annons",
+ age:"ålder",ago:"sedan",aid:"hjälp",aim:"sikta",dam:"damm",die:"dö",dig:"gräva",dim:"svag (ljus)",doe:"hind",dog:"hund",
+ fad:"modefluga",fed:"matade",fig:"fikon",foe:"fiende",fog:"dimma",gem:"ädelsten",god:"gud",mad:"arg",mid:"mitten",
+ oaf:"klantskalle",ode:"hyllningsdikt",veg:"grönsaker",vie:"tävla",vim:"energi",
+ aged:"gammal",aide:"medhjälpare",amid:"mitt bland",avid:"ivrig",dame:"dam",deaf:"döv",dime:"tiocentare",dive:"dyka",
+ dome:"kupol",dove:"duva",fade:"blekna",fame:"berömmelse",fave:"favorit",five:"fem",foam:"skum",game:"spel",gave:"gav",
+ give:"ge",goad:"driva på",idea:"idé",made:"gjorde",maid:"hembiträde",mead:"mjöd",mega:"jätte-",mode:"läge",move:"flytta",
+ void:"tomrum",aimed:"siktade",avoid:"undvika",famed:"berömd",image:"bild",media:"medier",midge:"knott",moved:"flyttade",
+ movie:"film",amigo:"kompis",foamed:"skummade"
+};
+// Same-word mode can also use words whose Swedish is identical
+const SAME_EXTRA="ego via demo diva dogma omega video imaged".split(" ");
+const MIN=10,MAX=30;
+const $=id=>document.getElementById(id);
+let deck=[],open=[],lock=false,found=0,tries=0,turn=1,score=[0,0],players=1,total=0;
+
+const clamp=n=>Math.max(MIN,Math.min(MAX,isNaN(n)?MIN:n));
+function setPairs(n){$("pairs").value=clamp(n)}
+$("minus").onclick=()=>setPairs(+$("pairs").value-1);
+$("plus").onclick=()=>setPairs(+$("pairs").value+1);
+$("pairs").addEventListener("change",()=>{const v=+$("pairs").value;setPairs(v);
+  $("note").textContent=v<MIN?"The smallest game has 10 words.":v>MAX?"The biggest game has 30 words.":"Choose 10 to 30 words. New game picks new words at random."});
+
+function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+
+function newGame(){
+  const n=clamp(+$("pairs").value);setPairs(n);
+  const mode=document.querySelector('input[name=mode]:checked').value;
+  players=+document.querySelector('input[name=pl]:checked').value;
+  const pool=mode==="sv"?Object.keys(DICT):[...Object.keys(DICT),...SAME_EXTRA];
+  const words=shuffle([...pool]).slice(0,n);
+  deck=[];
+  words.forEach(w=>{
+    deck.push({id:w,text:w,tag:"English"});
+    deck.push(mode==="sv"?{id:w,text:DICT[w],tag:"Svenska",sv:true}:{id:w,text:w,tag:"English"});
+  });
+  shuffle(deck);
+  open=[];lock=false;found=0;tries=0;turn=1;score=[0,0];total=n;
+  const b=$("board");b.innerHTML="";
+  deck.forEach((c,i)=>{
+    const el=document.createElement("button");el.type="button";el.className="card";el.dataset.i=i;
+    el.setAttribute("aria-label","Hidden card");
+    el.innerHTML=`<div class="in"><div class="f back"></div><div class="f front${c.sv?" sv":""}"><div>${mode==="sv"?`<small>${c.tag}</small>`:""}${c.text}</div></div></div>`;
+    el.onclick=()=>flip(el);b.appendChild(el);
+  });
+  $("ul").innerHTML=words.slice().sort().map(w=>`<li><b>${w}</b>${DICT[w]&&mode==="sv"?`<span>${DICT[w]}</span>`:""}</li>`).join("");
+  $("list").hidden=true;$("win").hidden=true;
+  $("solo").hidden=players!==1;$("P1").hidden=$("P2").hidden=players!==2;
+  update();
+}
+function update(){
+  $("found").textContent=found;$("total").textContent=total;$("tries").textContent=tries;
+  $("s1").textContent=score[0];$("s2").textContent=score[1];
+  $("P1").classList.toggle("on",turn===1);$("P2").classList.toggle("on",turn===2);
+}
+function flip(el){
+  if(lock||el.classList.contains("up")||el.classList.contains("done"))return;
+  const c=deck[el.dataset.i];el.classList.add("up");el.setAttribute("aria-label",c.text);open.push(el);
+  if(open.length<2)return;
+  tries++;const [a,b]=open;
+  if(deck[a.dataset.i].id===deck[b.dataset.i].id){
+    setTimeout(()=>{[a,b].forEach(x=>{x.classList.remove("up");x.classList.add("done");x.setAttribute("aria-label",x.getAttribute("aria-label")+", matched")});
+      found++;score[turn-1]++;open=[];update();if(found===total)win()},350);
+  }else{
+    lock=true;setTimeout(()=>{[a,b].forEach(x=>x.classList.add("miss"))},450);
+    setTimeout(()=>{[a,b].forEach(x=>{x.classList.remove("up","miss");x.setAttribute("aria-label","Hidden card")});
+      open=[];lock=false;if(players===2)turn=turn===1?2:1;update()},1300);
+  }
+  update();
+}
+function win(){
+  let t;
+  if(players===1)t=`Well done! You found all ${total} pairs in ${tries} tries.`;
+  else t=score[0]===score[1]?`It's a draw! ${score[0]} pairs each.`:`Player ${score[0]>score[1]?1:2} wins with ${Math.max(...score)} pairs!`;
+  $("winText").textContent=t;$("win").hidden=false;$("list").hidden=false;
+}
+$("settings").addEventListener("submit",e=>{e.preventDefault();newGame()});
+$("again").onclick=newGame;
+newGame();
+</script>
+</body>
+</html>
