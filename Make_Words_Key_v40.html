@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Make Words Key</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap">
+<style>
+/* Layout: letter tray + word builder on top, then rows of closed hatches grouped by word length */
+:root{
+  --bg:#f3f6fc; --surface:#ffffff; --ink:#172036; --muted:#5b6784;
+  --accent:#2457d6; --accent-ink:#ffffff; --hatch:#dfe6f5; --hatch-edge:#b9c6e3;
+  --open:#ffd84d; --open-ink:#3a2c00; --good:#14804a; --bad:#c2352b; --line:#d5ddef;
+  --display:"Fredoka","Nunito",system-ui,sans-serif; --body:"Nunito",system-ui,sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0f1526; --surface:#18203a; --ink:#e8edfb; --muted:#9aa7c7;
+  --accent:#5b86ff; --accent-ink:#0b1020; --hatch:#222c4b; --hatch-edge:#34426b;
+  --open:#f5c93a; --open-ink:#2a1f00; --good:#4fd08b; --bad:#ff7b70; --line:#2c3758; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0f1526; --surface:#18203a; --ink:#e8edfb; --muted:#9aa7c7;
+  --accent:#5b86ff; --accent-ink:#0b1020; --hatch:#222c4b; --hatch-edge:#34426b;
+  --open:#f5c93a; --open-ink:#2a1f00; --good:#4fd08b; --bad:#ff7b70; --line:#2c3758; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.5}
+.wrap{max-width:960px;margin:0 auto;padding-inline:16px;padding-block:24px 48px;display:grid;gap:28px}
+header{display:flex;flex-wrap:wrap;gap:12px 24px;align-items:end;justify-content:space-between}
+h1{font-family:var(--display);font-weight:700;font-size:clamp(28px,6vw,42px);line-height:1.05;margin:0;text-wrap:balance}
+.sub{margin:6px 0 0;color:var(--muted);max-width:52ch}
+.score{font-family:var(--display);font-weight:600;font-size:20px;display:grid;gap:6px;min-width:180px}
+.score b{font-size:32px;font-variant-numeric:tabular-nums}
+.bar{height:10px;border-radius:99px;background:var(--hatch);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--open);transition:width .4s}
+
+.play{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:20px;display:grid;gap:16px}
+.tray{display:flex;flex-wrap:wrap;gap:8px}
+.tile{font-family:var(--display);font-weight:700;font-size:26px;width:52px;height:56px;border-radius:12px;border:0;
+  background:var(--accent);color:var(--accent-ink);cursor:pointer;box-shadow:0 4px 0 color-mix(in srgb,var(--accent) 60%,#000);
+  transition:transform .1s,opacity .15s}
+.tile:active{transform:translateY(3px);box-shadow:0 1px 0 color-mix(in srgb,var(--accent) 60%,#000)}
+.tile:disabled{opacity:.25;cursor:default;transform:none}
+.tile:focus-visible,.btn:focus-visible,#guess:focus-visible{outline:3px solid var(--open);outline-offset:2px}
+.builder{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+#guess{flex:1 1 220px;min-width:0;font-family:var(--display);font-size:26px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;
+  padding:10px 16px;border-radius:12px;border:2px solid var(--line);background:var(--bg);color:var(--ink)}
+.btn{font-family:var(--body);font-weight:800;font-size:15px;padding:12px 18px;border-radius:12px;border:2px solid var(--line);
+  background:var(--surface);color:var(--ink);cursor:pointer}
+.btn.primary{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.msg{min-height:1.5em;font-weight:700;margin:0}
+.msg.good{color:var(--good)} .msg.bad{color:var(--bad)}
+.shake{animation:shake .35s}
+@keyframes shake{25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
+
+section.group h2{font-family:var(--display);font-weight:600;font-size:20px;margin:0 0 10px;display:flex;gap:10px;align-items:baseline}
+section.group h2 span{font-family:var(--body);font-size:14px;color:var(--muted);font-weight:700;font-variant-numeric:tabular-nums}
+.hatches{display:flex;flex-wrap:wrap;gap:10px}
+.hatch{perspective:600px;height:54px}
+.inner{position:relative;height:100%;transition:transform .6s;transform-style:preserve-3d}
+.hatch.open .inner{transform:rotateY(180deg)}
+.face{position:absolute;inset:0;backface-visibility:hidden;border-radius:10px;display:flex;align-items:center;justify-content:center;gap:4px;padding:0 10px}
+.front{background:var(--hatch);border:2px solid var(--hatch-edge)}
+.front i{width:14px;height:4px;border-radius:2px;background:var(--hatch-edge);align-self:flex-end;margin-bottom:14px;font-style:normal;
+  font-family:var(--display);font-weight:700;color:var(--muted);font-size:16px;line-height:0;display:flex;justify-content:center}
+.front i.hint{background:none;margin-bottom:0;align-self:center;line-height:1;height:auto;color:var(--accent)}
+.front::after{content:"";position:absolute;right:6px;top:50%;width:6px;height:6px;margin-top:-3px;border-radius:50%;background:var(--hatch-edge)}
+.back{background:var(--open);color:var(--open-ink);transform:rotateY(180deg);font-family:var(--display);font-weight:700;font-size:20px}
+.hatch.fresh .back{animation:pop .6s .5s}
+@keyframes pop{50%{transform:rotateY(180deg) scale(1.12)}}
+.bonus .front{border-style:dashed}
+
+.tools{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;border-top:1px solid var(--line);padding-top:18px}
+.confirm{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-weight:700}
+.chips{display:flex;flex-wrap:wrap;gap:8px}.chip{font-family:var(--display);font-weight:600;font-size:18px;padding:6px 14px;border-radius:99px;background:var(--surface);border:2px solid var(--open);color:var(--ink)}
+.empty{margin:0;color:var(--muted)}
+.done{background:var(--open);color:var(--open-ink);border-radius:18px;padding:18px 20px;font-family:var(--display);font-size:22px;font-weight:600}
+@media (prefers-reduced-motion:reduce){.inner,.bar i{transition:none}.shake,.hatch.fresh .back{animation:none}}
+@media (max-width:480px){.tile{width:calc((100% - 32px)/5);height:50px;font-size:22px}}
+</style>
+</head>
+<body style="margin:0">
+
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Make Words Key</h1>
+      <p class="sub">Every word hides behind a hatch. Build a word from the letters and press <b>Check</b>. If it is in the key, a hatch opens. Rare words count too and go on your extra list. Each letter can be used once in a word.</p>
+    </div>
+    <div class="score" aria-live="polite">
+      <div><b id="found">0</b> / <span id="total">0</span> words</div>
+      <div class="bar"><i id="barFill"></i></div>
+    </div>
+  </header>
+
+  <div class="play">
+    <div class="tray" id="tray" aria-label="Letters"></div>
+    <form class="builder" id="form">
+      <input id="guess" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-label="Your word" placeholder="Type or tap">
+      <button type="button" class="btn" id="back">⌫ Delete</button>
+      <button type="button" class="btn" id="clear">Clear</button>
+      <button type="submit" class="btn primary" id="check">Check</button>
+    </form>
+    <p class="msg" id="msg" aria-live="polite"></p>
+  </div>
+
+  <div id="doneBox" class="done" hidden>You found every word in the key! Can you open the bonus hatches too?</div>
+  <div id="groups" style="display:grid;gap:24px"></div>
+
+  <div class="tools">
+    <button type="button" class="btn" id="hint">Give me a hint</button>
+    <div id="resetArea"><button type="button" class="btn" id="reset">Close all hatches</button></div>
+  </div>
+</div>
+
+<script>
+const LETTERS="FOVAMDGIE".split("");
+const WORDS={
+ 2:"ad am do go if me of",
+ 3:"age ago aid aim dam die dig dim doe dog ego fad fed fig foe fog gem god mad mid oaf ode veg via vie vim",
+ 4:"aged aide amid avid dame deaf demo dime diva dive dome dove fade fame fave five foam game gave give goad idea made maid mead mega mode move void",
+ 5:"aimed avoid dogma famed image media midge moved movie omega video"
+};
+const BONUS="amigo foamed imaged".split(" ");
+// Rarer dictionary words: accepted as correct and collected in the extra list
+const EXTRA="ai em fa id ma mi mo oi ado ave dag emo fam fem fid fie gad gam gid goa mag med mig moa mod mog moi ova voe agio amie deva doge egad fado idem mage magi odea vagi vide vied amide defog dogie fadge fovea gamed geoid imago ogive".split(" ");
+const NAMES={2:"Two letters",3:"Three letters",4:"Four letters",5:"Five letters"};
+const all=[];Object.values(WORDS).forEach(s=>all.push(...s.split(" ")));
+const KEY="makewords-v40";
+let state={found:[],hints:{}};
+try{const s=JSON.parse(localStorage.getItem(KEY)||"null");if(s&&Array.isArray(s.found))state=Object.assign({hints:{}},s)}catch(e){}
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}};
+
+const $=id=>document.getElementById(id);
+const guess=$("guess"),msg=$("msg");
+
+// letter tray
+LETTERS.forEach((L,i)=>{const b=document.createElement("button");b.type="button";b.className="tile";b.textContent=L;b.dataset.i=i;
+  b.setAttribute("aria-label","Letter "+L);b.onclick=()=>{guess.value+=L;sync()};$("tray").appendChild(b)});
+
+function sync(){ // disable tiles already used in the current guess
+  const v=guess.value.toUpperCase().replace(/[^A-Z]/g,"");guess.value=v;
+  const used={};[...v].forEach(c=>used[c]=(used[c]||0)+1);
+  document.querySelectorAll(".tile").forEach(t=>{const c=t.textContent;t.disabled=!!used[c]&&used[c]>=1;if(used[c])used[c]--});
+  if(msg.dataset.keep!=="1"){msg.textContent="";msg.className="msg"}
+  msg.dataset.keep="";
+}
+guess.addEventListener("input",sync);
+$("back").onclick=()=>{guess.value=guess.value.slice(0,-1);sync();guess.focus()};
+$("clear").onclick=()=>{guess.value="";sync();guess.focus()};
+
+function hatch(w,bonus){
+  const d=document.createElement("div");d.className="hatch"+(bonus?" bonus":"");d.dataset.w=w;
+  d.style.width=(w.length*24+44)+"px";
+  const f=[...w].map((c,i)=>i===0&&state.hints[w]?`<i class="hint">${c.toUpperCase()}</i>`:"<i></i>").join("");
+  d.innerHTML=`<div class="inner"><div class="face front" aria-hidden="true">${f}</div><div class="face back">${w}</div></div>`;
+  d.setAttribute("aria-label",state.found.includes(w)?w:`Closed hatch, ${w.length} letters`);
+  if(state.found.includes(w))d.classList.add("open");
+  return d;
+}
+function render(){
+  const g=$("groups");g.innerHTML="";
+  const add=(title,list,bonus)=>{
+    const s=document.createElement("section");s.className="group";
+    const n=list.filter(w=>state.found.includes(w)).length;
+    s.innerHTML=`<h2>${title}<span>${n} / ${list.length}</span></h2>`;
+    const h=document.createElement("div");h.className="hatches";list.forEach(w=>h.appendChild(hatch(w,bonus)));
+    s.appendChild(h);g.appendChild(s)};
+  Object.keys(WORDS).forEach(k=>add(NAMES[k],WORDS[k].split(" ")));
+  add("Bonus hatches",BONUS,true);
+  const ex=document.createElement("section");ex.className="group";ex.id="extra";g.appendChild(ex);renderExtra();
+  score();
+}
+function score(){
+  const n=all.filter(w=>state.found.includes(w)).length;
+  $("found").textContent=n;$("total").textContent=all.length;
+  $("barFill").style.width=(n/all.length*100)+"%";
+  $("doneBox").hidden=n<all.length;
+  document.querySelectorAll("section.group:not(#extra)").forEach((s,i)=>{
+    const list=i<4?WORDS[Object.keys(WORDS)[i]].split(" "):BONUS;
+    s.querySelector("h2 span").textContent=`${list.filter(w=>state.found.includes(w)).length} / ${list.length}`});
+}
+function renderExtra(){
+  const got=EXTRA.filter(w=>state.found.includes(w));
+  $("extra").innerHTML=`<h2>Extra words<span>${got.length} found</span></h2>`+
+    (got.length?`<div class="chips">${got.map(w=>`<span class="chip">${w}</span>`).join("")}</div>`
+      :`<p class="empty">Rare words you find are correct too. They are collected here.</p>`);
+}
+function say(t,cls){msg.textContent=t;msg.className="msg "+cls;msg.dataset.keep="1"}
+function fits(w){const pool=[...LETTERS];for(const c of w.toUpperCase()){const i=pool.indexOf(c);if(i<0)return false;pool.splice(i,1)}return true}
+
+$("form").addEventListener("submit",e=>{
+  e.preventDefault();
+  const w=guess.value.toLowerCase();
+  const shake=()=>{guess.classList.remove("shake");void guess.offsetWidth;guess.classList.add("shake")};
+  if(w.length<2){say("A word needs at least two letters.","bad");shake();return}
+  if(!fits(w)){say("Use only the letters above, and each letter once.","bad");shake();return}
+  if(state.found.includes(w)){say(`You already found “${w}”. Find another one!`,"bad");shake();return}
+  if(all.includes(w)||BONUS.includes(w)){
+    state.found.push(w);save();
+    const h=document.querySelector(`.hatch[data-w="${w}"]`);
+    h.classList.add("open","fresh");h.setAttribute("aria-label",w);score();
+    say(BONUS.includes(w)?`Wow! “${w}” opened a bonus hatch!`:`Yes! “${w}” is in the key.`,"good");
+    guess.value="";sync();msg.dataset.keep="";
+  }else if(EXTRA.includes(w)){
+    state.found.push(w);save();renderExtra();
+    say(`Correct! “${w}” is a rare word. It goes on your extra list.`,"good");
+    guess.value="";sync();msg.dataset.keep="";
+  }else{say(`“${w}” is not in the key. Check the spelling or try another word.`,"bad");shake()}
+  guess.focus();
+});
+
+$("hint").onclick=()=>{
+  const left=all.filter(w=>!state.found.includes(w)&&!state.hints[w]);
+  if(!left.length){say("No more hints. You can do it!","good");return}
+  const w=left[Math.floor(Math.random()*left.length)];state.hints[w]=1;save();render();
+  say(`Hint: a ${w.length}-letter word starts with ${w[0].toUpperCase()}. Look for the letter on a hatch.`,"good");
+};
+
+function restoreReset(){$("resetArea").innerHTML=`<button type="button" class="btn" id="reset">Close all hatches</button>`;bindReset()}
+function bindReset(){$("reset").onclick=()=>{const a=$("resetArea");
+  a.innerHTML=`<span class="confirm">Close all hatches and start over? <button type="button" class="btn primary" id="yes">Yes, start over</button><button type="button" class="btn" id="no">No</button></span>`;
+  $("yes").onclick=()=>{state={found:[],hints:{}};save();render();restoreReset();say("All hatches are closed. Good luck!","good")};
+  $("no").onclick=restoreReset;}}
+bindReset();
+render();sync();
+</script>
+</body>
+</html>
